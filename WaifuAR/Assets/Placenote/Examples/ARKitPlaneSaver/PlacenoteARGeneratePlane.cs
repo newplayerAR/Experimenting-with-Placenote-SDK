@@ -29,7 +29,7 @@ namespace ARKitPlaneSaver
 
 	[System.Serializable]
 	public class PNLandmark{
-		//PNFeaturePointUnity but unwrapped so they can be serialized (JSON.NET had trouble de-serializing PNFeaturePointUnity)
+		// ??? PNFeaturePointUnity but unwrapped so they can be serialized (JSON.NET had trouble de-serializing PNFeaturePointUnity)
 		public int idx;
 		public int measCount;
 		public float maxViewAngle;
@@ -40,7 +40,7 @@ namespace ARKitPlaneSaver
     [System.Serializable]
     public class PlaneMeshList
     {
-        public ARPlaneMesh[] meshList;
+        public ARPlaneMesh[] meshList; // ****** an example of how to serialize multiple types
 		public PNLandmark[] landmarkList;
 
     }
@@ -59,7 +59,7 @@ namespace ARKitPlaneSaver
 
             if (UnityARSessionNativeInterface.IsARKit_1_5_Supported())
             {
-                PlacenotePlaneUtility.InitializePlanePrefab(meshPrefab);
+                PlacenotePlaneUtility.InitializePlanePrefab(meshPrefab); // ??? difference between meshPrefab vs planePrefab
             }
             else
             {
@@ -72,11 +72,11 @@ namespace ARKitPlaneSaver
             placenoteARAnchorManager = new PlacenoteARAnchorManager();
         }
 
-
+        // ****** for converting to JSON objects
         public JObject GetCurrentPlaneList()
         {
-            LinkedList<ARPlaneAnchorGameObject> list = placenoteARAnchorManager.GetCurrentPlaneAnchors();
-            PlaneMeshList saveList = new PlaneMeshList();
+            LinkedList<ARPlaneAnchorGameObject> list = placenoteARAnchorManager.GetCurrentPlaneAnchors(); // ****** get anchors
+            PlaneMeshList saveList = new PlaneMeshList(); // final result
             saveList.meshList = new ARPlaneMesh[list.Count];
             int planeNum = 0;
             Debug.Log("Creating list of + " + list.Count.ToString() + " planes");
@@ -104,12 +104,12 @@ namespace ARKitPlaneSaver
             return JObject.FromObject(saveList);
         }
 
-
+        // ****** read from saved JSON objects to generate planes
         public void LoadPlaneList(JToken mapMetadata)
         {
             //placenoteARAnchorManager = new PlacenoteARAnchorManager ();
 
-            if (loadedPlaneList.Count > 0)
+            if (loadedPlaneList.Count > 0) // ****** clear current planes is inherit
             {
                 foreach (var planeGo in loadedPlaneList)
                 {
@@ -130,7 +130,7 @@ namespace ARKitPlaneSaver
                 Debug.Log("Loading + " + planeList.meshList.Length.ToString() + " planes");
                 foreach (var plane in planeList.meshList)
                 {
-                    GameObject go = PlacenotePlaneUtility.CreatePlaneInScene(plane);
+                    GameObject go = PlacenotePlaneUtility.CreatePlaneInScene(plane); // ****** instantiate function
                     go.AddComponent<DontDestroyOnLoad>();  //this is so these GOs persist across scene loads
                     loadedPlaneList.AddLast(go);
                 }

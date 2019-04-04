@@ -50,9 +50,9 @@ namespace ARKitPlaneSaver
             FeaturesVisualizer.DisablePointcloud();
             FeaturesVisualizer.clearPointcloud();
 
-            ConfigureSession(false, true); // stop detection and delete existing planes
+            ConfigureSession(false, true); // ****** stop detection and delete existing planes
 
-            localizedFirstTime = false;
+            localizedFirstTime = false; // ****** similar to Localized
             mLabelText.text = "Exited: Click New Map or Load Map";
         }
 
@@ -60,7 +60,7 @@ namespace ARKitPlaneSaver
         // Load map and relocalize. Check OnStatusChange function for behaviour upon relocalization
         public void OnLoadMapClicked()
         {
-            // delete the planes.
+            // ****** delete the planes.
             ConfigureSession(false, false);
 
             mInitButtonPanel.SetActive(false);
@@ -113,7 +113,7 @@ namespace ARKitPlaneSaver
             );
         }
 
-
+        // ???
         public void OnDeleteMapClicked()
         {
             if (!LibPlacenote.Instance.Initialized())
@@ -148,7 +148,7 @@ namespace ARKitPlaneSaver
             mMappingButtonPanel.SetActive(true);
 
 
-            // start plane detection
+            // ****** start plane detection
             ConfigureSession(true, true);
             mPlaneGenerator.StartPlaneDetection();
 
@@ -175,15 +175,16 @@ namespace ARKitPlaneSaver
         {
             mLabelText.text = "Initializing ARKit";
             Application.targetFrameRate = 60;
-            ConfigureSession(false, false);
+            ConfigureSession(false, false); // ****** must know what this function does very clearly
         }
 
-
+        // ****** important in plane generation
         private void ConfigureSession(bool togglePlaneDetection, bool clearOldPlanes)
         {
 
             ARKitWorldTrackingSessionConfiguration config = new ARKitWorldTrackingSessionConfiguration();
 
+            // Turn ON/OFF plane detection
             if (togglePlaneDetection)
             {
                 if (UnityARSessionNativeInterface.IsARKit_1_5_Supported())
@@ -201,6 +202,7 @@ namespace ARKitPlaneSaver
                 config.planeDetection = UnityARPlaneDetection.None;
             }
 
+            // Clear current planes
             if (clearOldPlanes)
             {
                 mPlaneGenerator.ClearPlanes();
@@ -234,14 +236,14 @@ namespace ARKitPlaneSaver
                 (mapId) =>
                 {
                     LibPlacenote.Instance.StopSession();
-                    FeaturesVisualizer.DisablePointcloud();
+                    FeaturesVisualizer.DisablePointcloud(); // ****** used to turn off PointCloud
                     FeaturesVisualizer.clearPointcloud();
 
                     mLabelText.text = "Saved Map ID: " + mapId;
                     mInitButtonPanel.SetActive(true);
                     mMappingButtonPanel.SetActive(false);
 
-                    LibPlacenote.MapMetadataSettable metadata = CreateMetaDataObject();
+                    LibPlacenote.MapMetadataSettable metadata = CreateMetaDataObject(); // ****** prepare metadata to be saved
 
                     LibPlacenote.Instance.SetMetadata(mapId, metadata, (success) =>
                     {
@@ -303,7 +305,7 @@ namespace ARKitPlaneSaver
 
             if (mPlaneGenerator != null)
             {
-                userdata["planes"] = mPlaneGenerator.GetCurrentPlaneList();
+                userdata["planes"] = mPlaneGenerator.GetCurrentPlaneList(); // ****** method to turn planes into JSON objects
             }
             else
             {
@@ -356,13 +358,13 @@ namespace ARKitPlaneSaver
 
                 if (!localizedFirstTime)
                 {
-                    localizedFirstTime = true;
+                    localizedFirstTime = true; // ****** this is basically Localized
 
                     mLabelText.text = "Localized: loaded shapes";
 
                     if (mPlaneGenerator != null)
                     {
-                        JToken planeData = downloadedMetaData.userdata;
+                        JToken planeData = downloadedMetaData.userdata; // ****** initialize from stored metadata on first localization
                         mPlaneGenerator.LoadPlaneList(planeData);
                     }
                     else
