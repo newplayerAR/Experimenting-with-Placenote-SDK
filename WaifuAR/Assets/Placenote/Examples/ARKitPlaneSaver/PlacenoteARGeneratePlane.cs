@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.IO;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using UnityEngine.AI;
 
 namespace ARKitPlaneSaver
 {
@@ -131,6 +132,11 @@ namespace ARKitPlaneSaver
                 foreach (var plane in planeList.meshList)
                 {
                     GameObject go = PlacenotePlaneUtility.CreatePlaneInScene(plane); // ****** instantiate function
+                    // xxxxxx bake navemesh
+                    if (UnityARSessionNativeInterface.IsARKit_1_5_Supported())
+                    {
+                        go.GetComponent<NavMeshSurface>().BuildNavMesh();
+                    }
                     go.AddComponent<DontDestroyOnLoad>();  //this is so these GOs persist across scene loads
                     loadedPlaneList.AddLast(go);
                 }

@@ -767,7 +767,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 268337842}
-        m_MethodName: OnComeHereClicked
+        m_MethodName: OnComeHereClicked_NmA
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
