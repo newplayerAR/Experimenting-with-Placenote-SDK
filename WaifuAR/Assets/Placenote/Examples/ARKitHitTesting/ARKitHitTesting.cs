@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using UnityEngine.XR.iOS; // Import ARKit Library
+using System;
 
 namespace ARKitHitTesting
 {
@@ -19,6 +20,7 @@ namespace ARKitHitTesting
         public GameObject initPanel;
         public GameObject mappingPanel;
         public GameObject localizedPanel;
+        public GameObject mPlaneGenerator;
 
         public Text notifications;
 
@@ -36,6 +38,8 @@ namespace ARKitHitTesting
         void Start()
         {
             // Start ARKit using the Unity ARKit Plugin
+            downloadedMetaData = new LibPlacenote.MapMetadata();
+            Input.location.Start();
             mSession = UnityARSessionNativeInterface.GetARSessionNativeInterface();
             StartARKit(); // ******
 
@@ -48,12 +52,23 @@ namespace ARKitHitTesting
         // Add shape when button is clicked.
         public void OnNewMapClick()
         {
+            if (!LibPlacenote.Instance.Initialized())
+            {
+                Debug.Log("SDK not yet initialized");
+                return;
+            }
+
             notifications.text = "Mapping: Tap screen to add markers";
 
             initPanel.SetActive(false);
             mappingPanel.SetActive(true);
             localizedPanel.SetActive(false);
 
+            // ****** start plane detection
+            ConfigureSession(true, true);
+            mPlaneGenerator.GetComponent<PlacenoteARGeneratePlane>().StartPlaneDetection();
+
+            FeaturesVisualizer.EnablePointcloud();
             LibPlacenote.Instance.StartSession();
 
             IsNewMap = true;
@@ -62,13 +77,18 @@ namespace ARKitHitTesting
         // Initialize ARKit. This will be standard in all AR apps
         private void StartARKit()
         {
+            //Application.targetFrameRate = 60;
+            ////ARKitWorldTrackingSessionConfiguration config = new ARKitWorldTrackingSessionConfiguration();
+            ////config.planeDetection = UnityARPlaneDetection.Horizontal;
+            ////config.alignment = UnityARAlignment.UnityARAlignmentGravity;
+            ////config.getPointCloudData = true;
+            ////config.enableLightEstimation = true;
+            ////mSession.RunWithConfig(config);
+            //ConfigureSession(false, false);
+
+            notifications.text = "Initializing ARKit";
             Application.targetFrameRate = 60;
-            ARKitWorldTrackingSessionConfiguration config = new ARKitWorldTrackingSessionConfiguration();
-            config.planeDetection = UnityARPlaneDetection.Horizontal;
-            config.alignment = UnityARAlignment.UnityARAlignmentGravity;
-            config.getPointCloudData = true;
-            config.enableLightEstimation = true;
-            mSession.RunWithConfig(config);
+            ConfigureSession(false, false);
         }
 
         // Hide/show specific buttons; then start doing the map save magics
@@ -92,7 +112,11 @@ namespace ARKitHitTesting
             (mapId) =>
             {
                 savedMapID = mapId;
+
                 LibPlacenote.Instance.StopSession();
+                FeaturesVisualizer.DisablePointcloud(); // ****** used to turn off PointCloud
+                FeaturesVisualizer.clearPointcloud();
+
                 WriteMapIDToFile(mapId);
 
                 LibPlacenote.MapMetadataSettable metadata = CreateMetaDataObject();
@@ -109,7 +133,11 @@ namespace ARKitHitTesting
                     }
                 });
 
-                GetComponent<MarkerManager>().ClearModels();
+                // XXXXXX
+                // GetComponent<MarkerManager>().ClearModels();
+
+                // Clear planes;
+                mPlaneGenerator.GetComponent<PlacenoteARGeneratePlane>().ClearPlanes();
 
             },
             (completed, faulted, percentage) =>
@@ -153,8 +181,20 @@ namespace ARKitHitTesting
 
             // ****** JSON object for this gameObject (e.g.: MarkerManager in this case)
             JObject userdata = new JObject();
-            JObject modelList = GetComponent<MarkerManager>().Models2JSON(); // The gameObject has to implement this method to be converted
-            userdata["modelList"] = modelList;
+
+            // XXXXXX turn markers into JSON objects
+            //JObject modelList = GetComponent<MarkerManager>().Models2JSON(); // The gameObject has to implement this method to be converted
+            //userdata["modelList"] = modelList;
+
+            // ****** turn planes into JSON objects
+            if (mPlaneGenerator != null)
+            {
+                userdata["planes"] = mPlaneGenerator.GetComponent<PlacenoteARGeneratePlane>().GetCurrentPlaneList(); // ****** method to turn planes into JSON objects
+            }
+            else
+            {
+                Debug.Log("No plane generator object, not saving planes");
+            }
 
             metadata.userdata = userdata;
             return metadata;
@@ -164,6 +204,9 @@ namespace ARKitHitTesting
         // Load map and relocalize. Check OnStatusChange function for behaviour upon relocalization
         public void OnLoadMapClicked()
         {
+            // ****** delete the planes.
+            ConfigureSession(false, false);
+
             initPanel.SetActive(false);
             mappingPanel.SetActive(false);
             localizedPanel.SetActive(true);
@@ -216,14 +259,22 @@ namespace ARKitHitTesting
         public void OnExitClicked()
         {
             LibPlacenote.Instance.StopSession();
+            FeaturesVisualizer.DisablePointcloud();
             FeaturesVisualizer.clearPointcloud();
-            GetComponent<MarkerManager>().ClearModels();
 
-            Localized = false;
+            // XXXXXX Clear markers
+            //GetComponent<MarkerManager>().ClearModels();
+            // Clear planes
+            mPlaneGenerator.GetComponent<PlacenoteARGeneratePlane>().ClearPlanes();
 
             initPanel.SetActive(true);
             mappingPanel.SetActive(false);
             localizedPanel.SetActive(false);
+
+            ConfigureSession(false, true); // ****** stop detection and delete existing planes
+
+            Localized = false;
+            notifications.text = "Exited: Click New Map or Load Map";
         }
 
         // ?????? Runs when a new pose is received from Placenote.
@@ -239,14 +290,36 @@ namespace ARKitHitTesting
                 {
                     Localized = true;
 
-                    JToken modelData = downloadedMetaData.userdata;
-                    GetComponent<MarkerManager>().LoadModelsFromJSON(modelData); // ****** Called after localization
+                    JToken metaData = downloadedMetaData.userdata;
+                    //GetComponent<MarkerManager>().LoadModelsFromJSON(metaData); // XXXXXX Called after localization
 
-                    // ****** Set up Interactions
-                    SetUpInteractions();
+                    // ****** initialize planes from stored metadata on first localization
+                    if (mPlaneGenerator != null)
+                    {
+                        //JToken planeData = downloadedMetaData.userdata;
+                        mPlaneGenerator.GetComponent<PlacenoteARGeneratePlane>().LoadPlaneList(metaData);
+                    }
+                    else
+                    {
+                        Debug.Log("No plane generator object, not saving planes");
+                    }
+
+                    // XXXXXX Set up Interactions
+                    //SetUpInteractions();
 
                     // Placenote will automatically correct the camera position on localization.
                 }
+            }
+            else if (currStatus == LibPlacenote.MappingStatus.RUNNING && prevStatus == LibPlacenote.MappingStatus.WAITING)
+            {
+                notifications.text = "Mapping";
+            }
+            else if (currStatus == LibPlacenote.MappingStatus.LOST)
+            {
+                notifications.text = "Searching for position lock";
+            }
+            else if (currStatus == LibPlacenote.MappingStatus.WAITING)
+            {
             }
         }
 
@@ -257,6 +330,7 @@ namespace ARKitHitTesting
             StreamWriter writer = new StreamWriter(path, false);
             writer.WriteLine(mapID);
             writer.Close();
+
         }
 
         // ******
@@ -271,9 +345,51 @@ namespace ARKitHitTesting
             return returnValue;
         }
 
-        private void SetUpInteractions()
+        // XXXXXX
+        //private void SetUpInteractions()
+        //{
+        //    GameObject.Find("Interactions").GetComponent<ModelMovementController>().CurModel = GetComponent<MarkerManager>().CurModel;
+        //}
+
+        // ****** important in plane generation
+        private void ConfigureSession(bool togglePlaneDetection, bool clearOldPlanes)
         {
-            GameObject.Find("Interactions").GetComponent<ModelMovementController>().CurModel = GetComponent<MarkerManager>().CurModel;
+
+            ARKitWorldTrackingSessionConfiguration config = new ARKitWorldTrackingSessionConfiguration();
+
+            // Turn ON/OFF plane detection
+            if (togglePlaneDetection)
+            {
+                if (UnityARSessionNativeInterface.IsARKit_1_5_Supported())
+                {
+                    config.planeDetection = UnityARPlaneDetection.HorizontalAndVertical;
+                }
+                else
+                {
+                    config.planeDetection = UnityARPlaneDetection.Horizontal;
+                }
+
+            }
+            else
+            {
+                config.planeDetection = UnityARPlaneDetection.None;
+            }
+
+            // Clear current planes
+            if (clearOldPlanes)
+            {
+                mPlaneGenerator.GetComponent<PlacenoteARGeneratePlane>().ClearPlanes();
+            }
+
+            config.alignment = UnityARAlignment.UnityARAlignmentGravity;
+            config.getPointCloudData = true;
+            config.enableLightEstimation = true;
+
+            UnityARSessionRunOption options = new UnityARSessionRunOption();
+            //options = UnityARSessionRunOption.ARSessionRunOptionRemoveExistingAnchors | UnityARSessionRunOption.ARSessionRunOptionResetTracking;
+            options = UnityARSessionRunOption.ARSessionRunOptionRemoveExistingAnchors;
+            mSession.RunWithConfigAndOptions(config, options);
+
         }
     }
 }

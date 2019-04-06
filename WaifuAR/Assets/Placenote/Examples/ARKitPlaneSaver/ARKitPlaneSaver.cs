@@ -18,6 +18,7 @@ namespace ARKitPlaneSaver
         [SerializeField] GameObject localizedPanel;
         [SerializeField] Text mLabelText;
         [SerializeField] PlacenoteARGeneratePlane mPlaneGenerator;
+        [SerializeField] ModelManager mModelManager;
 
         private UnityARSessionNativeInterface mSession;
 
@@ -30,6 +31,10 @@ namespace ARKitPlaneSaver
         private UnityARCamera mARCamera;
         private bool mARKitInit = false;
         private bool localizedFirstTime = false;
+        private bool atNewMap = false;
+
+        public bool LocalizedFirstTime { get => localizedFirstTime; set => localizedFirstTime = value; }
+        public bool AtNewMap { get => atNewMap; set => atNewMap = value; }
 
         // Use this for initialization
         void Start()
@@ -51,8 +56,9 @@ namespace ARKitPlaneSaver
             FeaturesVisualizer.clearPointcloud();
 
             ConfigureSession(false, true); // ****** stop detection and delete existing planes
+            mModelManager.ClearModels(); // xxxxxx Clear markers
 
-            localizedFirstTime = false; // ****** similar to Localized
+            LocalizedFirstTime = false; // ****** similar to Localized
             mLabelText.text = "Exited: Click New Map or Load Map";
         }
 
@@ -81,23 +87,23 @@ namespace ARKitPlaneSaver
             {
                 if (completed)
                 {
-                // Get the meta data as soon as the map is downloaded
-                LibPlacenote.Instance.GetMetadata(mCurrMapId, (LibPlacenote.MapMetadata obj) =>
-                    {
-                        if (obj != null)
+                    // Get the meta data as soon as the map is downloaded
+                    LibPlacenote.Instance.GetMetadata(mCurrMapId, (LibPlacenote.MapMetadata obj) =>
                         {
-                            downloadedMetaData = obj;
+                            if (obj != null)
+                            {
+                                downloadedMetaData = obj;
 
-                        // Now try to localize the map
-                        mLabelText.text = "Trying to Localize Map: " + mCurrMapId;
-                            LibPlacenote.Instance.StartSession();
-                        }
-                        else
-                        {
-                            mLabelText.text = "Failed to download meta data";
-                            return;
-                        }
-                    });
+                                // Now try to localize the map
+                                mLabelText.text = "Trying to Localize Map: " + mCurrMapId;
+                                LibPlacenote.Instance.StartSession();
+                            }
+                            else
+                            {
+                                mLabelText.text = "Failed to download meta data";
+                                return;
+                            }
+                        });
 
                 }
                 else if (faulted)
@@ -154,6 +160,8 @@ namespace ARKitPlaneSaver
 
             FeaturesVisualizer.EnablePointcloud();
             LibPlacenote.Instance.StartSession();
+
+            atNewMap = true;
 
         }
 
@@ -228,17 +236,18 @@ namespace ARKitPlaneSaver
                 return;
             }
 
-            bool useLocation = Input.location.status == LocationServiceStatus.Running;
-            LocationInfo locationInfo = Input.location.lastData;
+            //bool useLocation = Input.location.status == LocationServiceStatus.Running;
+            //LocationInfo locationInfo = Input.location.lastData;
 
             mLabelText.text = "Saving...";
+            atNewMap = false;
             LibPlacenote.Instance.SaveMap(
                 (mapId) =>
                 {
                     LibPlacenote.Instance.StopSession();
                     FeaturesVisualizer.DisablePointcloud(); // ****** used to turn off PointCloud
                     FeaturesVisualizer.clearPointcloud();
-
+                    
                     mLabelText.text = "Saved Map ID: " + mapId;
                     mInitButtonPanel.SetActive(true);
                     mMappingButtonPanel.SetActive(false);
@@ -258,7 +267,7 @@ namespace ARKitPlaneSaver
                     });
 
                     SaveMapIDToFile(mapId);
-
+                    
                 },
                 (completed, faulted, percentage) =>
                 {
@@ -267,10 +276,11 @@ namespace ARKitPlaneSaver
                     {
                         mLabelText.text = "Upload Complete:";
 
-                    // delete the planes.
-                    ConfigureSession(false, true);
+                        // delete the planes.
+                        ConfigureSession(false, true);
 
-
+                        // xxxxxx delete the models.
+                        mModelManager.ClearModels();
                     }
                     else if (faulted)
                     {
@@ -302,6 +312,16 @@ namespace ARKitPlaneSaver
             }
 
             JObject userdata = new JObject();
+
+            // xxxxxx turn models into json
+            if (mModelManager != null)
+            {
+                userdata["modelList"] = mModelManager.Models2JSON();
+            }
+            else
+            {
+                Debug.Log("No model manager object, not saving models");
+            }
 
             if (mPlaneGenerator != null)
             {
@@ -356,21 +376,35 @@ namespace ARKitPlaneSaver
             {
                 mLabelText.text = "Localized State!";
 
-                if (!localizedFirstTime)
+                if (!LocalizedFirstTime)
                 {
-                    localizedFirstTime = true; // ****** this is basically Localized
+                    LocalizedFirstTime = true; // ****** this is basically Localized
 
                     mLabelText.text = "Localized: loaded shapes";
 
+
+                    JToken metaData = downloadedMetaData.userdata; // ****** initialize from stored metadata on first localization
+
                     if (mPlaneGenerator != null)
                     {
-                        JToken planeData = downloadedMetaData.userdata; // ****** initialize from stored metadata on first localization
-                        mPlaneGenerator.LoadPlaneList(planeData);
+                        mPlaneGenerator.LoadPlaneList(metaData);
                     }
                     else
                     {
-                        Debug.Log("No plane generator object, not saving planes");
+                        Debug.Log("No plane generator object, not loading planes");
                     }
+
+                    if (mModelManager != null)
+                    {
+                        mModelManager.LoadModelsFromJSON(metaData); // xxxxxx Called after localization to generate stored models
+                    }
+                    else
+                    {
+                        Debug.Log("No model manager object, not loading models");
+                    }
+
+                    // xxxxxx Set up Interactions
+                    SetUpInteractions();
                 }
             }
             else if (currStatus == LibPlacenote.MappingStatus.RUNNING && prevStatus == LibPlacenote.MappingStatus.WAITING)
@@ -384,6 +418,12 @@ namespace ARKitPlaneSaver
             else if (currStatus == LibPlacenote.MappingStatus.WAITING)
             {
             }
+        }
+
+        // xxxxxx Set up controllable target(s)
+        private void SetUpInteractions()
+        {
+            GameObject.Find("Interactions").GetComponent<ModelMovementController>().CurModel = mModelManager.CurModel;
         }
     }
 }
