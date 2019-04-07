@@ -22,12 +22,19 @@ Shader "UnityChan/Clothing - Double-sided"
 			"RenderType"="Opaque"
 			"Queue"="Geometry"
 			"LightMode"="ForwardBase"
-		}		
+		}
 
 		Pass
 		{
 			Cull Off
 			ZTest LEqual
+            
+            // xxxxxx to hide mesh when positioned behind planes
+            Stencil
+            {
+                Ref 1
+                Comp notequal
+            }
 CGPROGRAM
 #pragma multi_compile_fwdbase
 #pragma target 3.0

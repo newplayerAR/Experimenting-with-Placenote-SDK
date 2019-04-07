@@ -20,6 +20,12 @@ Shader "UnityChan/Eyelash - Transparent"
 			"RenderType"="Overlay"
 			"LightMode"="ForwardBase"
 		}
+        
+        // xxxxxx to hide mesh when positioned behind planes
+        Stencil{
+            Ref 1
+            Comp notequal
+        }
 
 		Pass
 		{
