@@ -12,6 +12,12 @@ Shader "UnityChan/Blush - Transparent"
 
 	SubShader
 	{
+        //Stencil
+        //{
+        //    Ref 1
+        //    Comp notequal
+        //}
+        
 		Blend SrcAlpha OneMinusSrcAlpha, One One 
 		ZWrite Off
 		Tags
@@ -21,17 +27,13 @@ Shader "UnityChan/Blush - Transparent"
 			"RenderType"="Overlay"
 			"LightMode"="ForwardBase"
 		}
-        	
+            
 		Pass
 		{
 			Cull Back
 			ZTest LEqual
             // xxxxxx to hide mesh when positioned behind planes
-            Stencil
-            {
-                Ref 1
-                Comp notequal
-            }
+            
 CGPROGRAM
 #pragma multi_compile_fwdbase
 #pragma target 3.0

@@ -12,6 +12,12 @@ Shader "UnityChan/Skin - Transparent"
 
 	SubShader
 	{
+        //Stencil
+        //{
+        //    Ref 1
+        //    Comp notequal
+        //}
+        
 		Blend SrcAlpha OneMinusSrcAlpha, One One 
 		Tags
 		{
@@ -20,12 +26,6 @@ Shader "UnityChan/Skin - Transparent"
 			"RenderType"="Overlay"
 			"LightMode"="ForwardBase"
 		}
-        
-        // xxxxxx to hide mesh when positioned behind planes
-        Stencil{
-            Ref 1
-            Comp notequal
-        }
 		
 		Pass
 		{

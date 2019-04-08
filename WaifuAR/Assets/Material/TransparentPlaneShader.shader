@@ -1,30 +1,44 @@
-﻿/*
- * To be attached to the mesh of the Portal
- * Should set render queue to before geometry, however this will
- * Result in objects closer than the portal to still be rendererd
- */
-
-
-Shader "Custom/TransparentPlane"
+﻿Shader "Custom/TransparentPlane"
 {
-    SubShader
-    {
-    
-        //render objects behind the portal
-        ZWrite off
-        //absolutely transparent
-        ColorMask 0
-        //Bidirectional behaviour
-        Cull off
-        
-        Pass
-        {
-            Stencil{
-                //set all pixels in the portal to 1
-                Ref 1
-                Comp always
-                Pass replace
+    SubShader {
+            Pass {
+                // Render the Occlusion shader before all
+                // opaque geometry to prime the depth buffer.
+                Tags { "Queue"="Geometry" }
+
+                ZWrite On
+                ZTest LEqual
+                ColorMask 0
+
+                CGPROGRAM
+                #pragma vertex vert
+                #pragma fragment frag
+
+                #include "UnityCG.cginc"
+
+                struct appdata
+                {
+                    float4 vertex : POSITION;
+                };
+
+                struct v2f
+                {
+                    float4 position : SV_POSITION;
+                };
+
+                v2f vert (appdata input)
+                {
+                    v2f output;
+
+                    output.position = UnityObjectToClipPos(input.vertex);
+                    return output;
+                }
+
+                fixed4 frag (v2f input) : SV_Target
+                {
+                    return fixed4(0.5, 0.3, 0.0, 1.0);
+                }
+                ENDCG
             }
-        }
     }
 }

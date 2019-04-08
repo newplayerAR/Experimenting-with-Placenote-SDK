@@ -25,10 +25,10 @@ Shader "UnityChan/Hair"
 		}
         
         // xxxxxx to hide mesh when positioned behind planes
-        Stencil{
-            Ref 1
-            Comp notequal
-        }
+        //Stencil{
+        //    Ref 1
+        //    Comp notequal
+        //}
 
 		Pass
 		{
